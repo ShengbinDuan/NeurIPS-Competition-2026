@@ -1,17 +1,16 @@
 # 🧠 NeurIPS Competition 2026
 
-This repository is created for our team's participation in the **NeurIPS Competition 2026**.
+This repository is created for our participation in the **NeurIPS Competition 2026**.
 
-We are currently focusing on **Track 2: Paradigm Recognition**.
+We are currently focusing on **Track 2: BCI Decoding**.  
+The repository is used to share code, track experiments, and record our progress during the competition.
 
-The repository will be used to share code, record progress, and collaborate with team members during the competition. 🚀
+## 🏆 Warm-up Phase
 
-More content will be added as the project develops.
+Our current submission achieved a **Balanced Accuracy of 0.89** in the warm-up phase.
 
-## 👥 Team
-
-Contributors will be added gradually.
+![Warm-up Phase Result](image/BCI.png)
 
 ## 📌 Status
 
-🚧 Project is currently under development.
+🚧 Experiments and model improvements are still in progress.
