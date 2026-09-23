@@ -7,7 +7,7 @@ The repository is used to share code, track experiments, and record our progress
 
 ## 🏆 Warm-up Phase
 
-Our current submission achieved a **Balanced Accuracy of 0.89** in the warm-up phase.
+Our current submission achieved a **Balanced Accuracy of 0.90** in the warm-up phase.
 
 ![Warm-up Phase Result](image/BCI.png)
 
