@@ -1,0 +1,5 @@
+numpy
+scikit-learn
+# CPU 版 torch 即可（官方 Simulated 评分路径不需要 GPU）。
+# 安装 CPU 版：pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch
