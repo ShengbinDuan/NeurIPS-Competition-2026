@@ -1,0 +1,13 @@
+dataset download
+
+
+first：python -m pip install -U nemar-py
+
+
+next：nemar-py download nm000144 `
+    --scope sourcedata `
+    -o "D:\NIPS2026\Scherer2015Individually"
+
+
+
+finally：Get-ChildItem "D:\NIPS2026\Scherer2015Individually\sourcedata"
