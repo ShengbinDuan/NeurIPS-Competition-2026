@@ -14,3 +14,10 @@ Our current submission achieved a **Balanced Accuracy of 0.90** in the warm-up p
 ## 📌 Status
 
 🚧 Experiments and model improvements are still in progress.
+
+## EEG preprocessing
+
+The warm-up EEG preprocessing project is available in [`preprocessing/`](preprocessing/).
+Its [Chinese README](preprocessing/README.md) explains data placement, manual annotations,
+workflow switches, cache invalidation, and the most important processing parameters.
+The project includes source code and empty configuration templates; data and generated artifacts are excluded.

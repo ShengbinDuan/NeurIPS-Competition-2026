@@ -1,0 +1,32 @@
+# Python, environments, build output and temporary files
+__pycache__/
+_pycache_/
+*.py[cod]
+.venv/
+.env
+.env.*
+build/
+dist/
+*.egg-info/
+temp/
+tmp/
+tests/
+*.temp
+*.tmp
+
+# Keep the original directory hierarchy, but never add local data/artifacts.
+/assets/**
+!/assets/**/
+!/assets/**/.gitkeep
+/cache/**
+!/cache/**/
+!/cache/**/.gitkeep
+/data/**
+!/data/**/
+!/data/**/.gitkeep
+/results/**
+!/results/**/
+!/results/**/.gitkeep
+/rubbish/**
+!/rubbish/**/
+!/rubbish/**/.gitkeep
