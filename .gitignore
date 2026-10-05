@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+data/cleaned_filtered_fif_2-45Hz.zip
+data/cleaned_filtered_fif_4-40Hz.zip
+data/cleaned_nonfiltered_fif_0.5-100Hz.zip
