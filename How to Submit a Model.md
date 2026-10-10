@@ -1,0 +1,3 @@
+https://facebookresearch.github.io/neuroai/neuralbench/auto_examples/biosignal_challenge_2026/plot_submission_guide.html
+
+Preprocessing. The EEG benchmark tasks resample to 120 Hz and apply a 0.1-75 Hz bandpass, a 50/60 Hz notch, a RobustScaler and a clamp at 20 before the model sees anything; emg pose deliberately does none of it and feeds raw 2 kHz. The stream tasks of Tracks 2 and 3 replace the scaler and the clamp with a fixed conversion to microvolts, and Track 3’s also drops the resampling and the filters. Codabench passes windows at whatever meta["sfreq"] reports and expects model-specific preprocessing to live in submission.py, so a model lifted from a run needs its config’s chain reproduced there; preprocessing done inside the model ships with it.
