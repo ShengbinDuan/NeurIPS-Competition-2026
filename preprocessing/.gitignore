@@ -10,11 +10,10 @@ dist/
 *.egg-info/
 temp/
 tmp/
-tests/
 *.temp
 *.tmp
 
-# Keep the original directory hierarchy, but never add local data/artifacts.
+# Preserve the runtime skeleton while excluding local data and generated files.
 /assets/**
 !/assets/**/
 !/assets/**/.gitkeep
@@ -27,6 +26,3 @@ tests/
 /results/**
 !/results/**/
 !/results/**/.gitkeep
-/rubbish/**
-!/rubbish/**/
-!/rubbish/**/.gitkeep

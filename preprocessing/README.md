@@ -1,98 +1,105 @@
 # EEG 预处理：NeurIPS Competition 2026
 
-本目录保存 warm-up 阶段的连续 EEG 预处理工程。主程序是 [`src/Preprocessing.py`](src/Preprocessing.py)，使用 MNE 完成坏道插值、滤波、重参考、ICA 检查和伪迹重建，通过 `True` / `False` 控制各个阶段。
+本目录保存 warm-up 阶段的连续 EEG 预处理代码，使用 MNE 完成坏道插值、滤波、重参考、ICA 检查及伪迹重建。新版将 ICA 建模与绘图分开，并增加按上游缓存标识恢复处理的机制，变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
-发布副本保留原工程的目录层级及 `src` 源码。`data`、`cache`、`results`、`assets` 和 `rubbish` 中不包含原始数据、缓存、图片、文档或历史脚本；`configs` 中保留两个 JSON 的键和嵌套结构，但所有列表都已清空。Git 用零字节 `.gitkeep` 保存空文件夹。虚拟环境、`__pycache__`、临时目录和 `tests` 不随本工程发布。
+导出副本保留当前源码、方法参数配置和运行所需目录。原始 MAT、已有缓存、结果图片、虚拟环境及资料文件不随代码发布；空目录通过 `.gitkeep` 保留。两个人工标注 JSON 保留全部 session 键，但列表均清空，需结合自己的数据重新填写。
 
-## 1. 安装与运行位置
+## 1. 安装与快速开始
 
-使用 Python 3.12 或更新版本。工程的 `.python-version` 指定 3.12；整理时使用的环境为 Python 3.12.13、MNE 1.13.2、NumPy 2.5.3、SciPy 1.18.1、Matplotlib 3.11.2 和 python-picard 0.8.2。
+使用 Python 3.12；整理时环境为 Python 3.12.13。核心依赖固定为 MNE 1.13.2、NumPy 2.5.3、SciPy 1.18.1、Matplotlib 3.11.2、python-picard 0.8.2，记录在 [`requirements-core.txt`](requirements-core.txt)。
 
-在仓库根目录执行：
+在仓库根目录打开 PowerShell：
 
 ```powershell
 cd preprocessing
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install "mne>=1.13.2" "numpy>=2.5.3" "scipy>=1.18.1" "matplotlib>=3.11.2" "python-picard>=0.8.2"
+.\.venv\Scripts\python.exe -m pip install -r requirements-core.txt
 ```
 
-上述依赖对应 `pyproject.toml` 中的预处理依赖。`requirements.txt` 另保留了原实验环境的完整依赖清单，包含训练、下载等额外工具；需要复现完整环境时可执行 `python -m pip install -r requirements.txt`。
+Linux / macOS 可将上述虚拟环境解释器路径改为 `.venv/bin/python`。完整的 [`requirements.txt`](requirements.txt) 保留原实验环境的依赖，包含训练、下载及 Windows 工具等额外软件；只运行本目录的预处理时安装核心清单即可。
 
-准备好下一节的数据和配置后运行：
+按第 3 节放好 MAT 后，先查看原始波形：
 
 ```powershell
-.\.venv\Scripts\python.exe src/Preprocessing.py
+.\.venv\Scripts\python.exe run_preprocessing.py --stage waveforms
 ```
 
-**工作目录必须是本目录 `preprocessing/`**。代码中的 `./data`、`./configs`、`./cache`、`./results` 都相对于当前工作目录，而不是脚本所在位置。导入模块也会创建必要的缓存和结果目录。
+根据波形填写坏道列表，再生成 ICA 地形图：
 
-当前 `pyproject.toml` 注册的 `preprocessing` 命令指向 `src/preprocessing/__init__.py`，该函数只打印 `Hello from preprocessing!`。实际预处理请使用上面的脚本入口，或导入 `src.Preprocessing.main`。Matplotlib 使用 `Agg` 后端，图片写到磁盘，不弹出交互式标注窗口。
+```powershell
+.\.venv\Scripts\python.exe run_preprocessing.py --stage ica
+```
 
-## 2. 数据文件怎么放
+首次运行会处理选定的全部被试和 session，ICA 拟合可能耗时。所有图片都写入磁盘；代码使用 `Agg` 后端，不弹出交互式标注窗口。
 
-主要目录如下；已有的多级资料与结果文件夹也保留在仓库中：
+## 2. 目录与入口
 
 ```text
 preprocessing/
+├── run_preprocessing.py              # 发布副本的分阶段运行入口
 ├── src/
-│   ├── Preprocessing.py          # 真实的工作流与全部处理函数
-│   └── preprocessing/__init__.py
+│   ├── Preprocessing.py              # 主版本：步骤字典、缓存标识及 start 恢复
+│   ├── preprocessing_config_version.py # 独立的配置实验版本
+│   └── preprocessing/__init__.py     # 现有包入口占位函数
 ├── configs/
-│   ├── bad_channels_exclude.json
-│   └── ica_exclude.json
-├── data/                        # 自行放入 A.mat、C.mat 等
+│   ├── config.py                     # 仅供配置实验版本使用的方法参数
+│   ├── bad_channels_exclude.json     # 各 session 的坏道名单
+│   └── ica_exclude.json              # ICA 候选及最终排除名单
+├── data/                             # 自行放入 A.mat、C.mat 等
 ├── cache/
-│   ├── data/
-│   ├── raw/                     # 当前程序未使用的预留目录
-│   ├── raw_interp/
-│   ├── raw_pre_filter/
-│   ├── raw_referenced/
-│   ├── ica/
-│   ├── raw_cleaned/
-│   └── raw_after_filter/
+│   ├── cache_v2/                     # 主版本的分版本缓存
+│   │   ├── data/
+│   │   ├── raw/                     # 预留，当前主流程未使用
+│   │   ├── raw_interp/
+│   │   ├── raw_pre_filter/
+│   │   ├── raw_referenced/
+│   │   ├── ica/
+│   │   ├── raw_cleaned/
+│   │   └── raw_after_filter/         # 初始声明目录；实际输出见下一项
+│   ├── raw_after_filter_4-40/         # 主版本当前实际后滤波路径
+│   ├── data/                         # 配置实验版本的 MAT 缓存
+│   └── config_version/               # 配置实验版本按参数编号隔离的缓存
 ├── results/
-│   ├── waveforms/
-│   ├── components/
-│   ├── properties/              # 再按 A0、A1 等 session 分目录
-│   ├── storage/
-│   ├── waveforms_larger/
-│   └── waveforms_smaller/
-├── assets/                      # 保留资料归档目录层级
-├── rubbish/                     # 保留空目录
-├── .python-version
-├── pyproject.toml
-└── requirements.txt
+│   ├── waveforms/                    # 主版本原始波形
+│   ├── components/                   # 主版本 ICA 地形图
+│   ├── properties/                   # 主版本候选 IC 诊断图，按 session 分目录
+│   └── config_version/               # 配置实验版本的图和参数快照
+├── assets/                           # 资料目录占位
+├── CHANGELOG.md
+├── requirements-core.txt
+├── requirements.txt
+└── pyproject.toml
 ```
 
-默认 `subjects = ["A", "C", "D", "E", "F", "G", "H", "J", "L"]`，因此将以下文件直接放在 `data/`，不要再套一层被试文件夹：
+缓存和结果的动态子目录在需要时自动创建。安装包后注册的 `preprocessing` 命令目前只打印 `Hello from preprocessing!`；实际运行请使用本文的脚本命令。
+
+主版本的 `./data`、`./configs`、`./cache`、`./results` 相对于工作目录。辅助入口 `run_preprocessing.py` 会自动切换到本项目目录；直接运行或导入 `src/Preprocessing.py` 时，需要自行保证工作目录为 `preprocessing/`。配置实验版本以脚本位置定位项目目录。
+
+## 3. 输入数据与人工标注
+
+默认读取以下 9 个文件，须全部存在；想先处理少量数据，可修改对应版本源码中的 `subjects`：
 
 ```text
 data/A.mat  data/C.mat  data/D.mat  data/E.mat  data/F.mat
 data/G.mat  data/H.mat  data/J.mat  data/L.mat
 ```
 
-只处理部分被试时，修改 `src/Preprocessing.py` 顶部的 `subjects`，例如 `subjects = ["A", "C"]`。选中的文件均需存在；仓库不含数据，也没有自动下载过程。
+代码不会下载数据。MAT 有效内容位于 `data` 字段，使用 `scipy.io.loadmat(..., simplify_cells=True)` 读取后应为可遍历的 session 序列，每个 session 为字典：
 
-每个 MAT 文件的有效内容在 `data` 字段中，按 session 存放结构，包含：
-
-| 字段 | 含义与代码处理 |
+| 字段 | 当前代码的约定 |
 | --- | --- |
-| `X` | 连续电压；当前调用假定原始形状为 `(采样点, 30 个通道)`，转置成 `(通道, 采样点)`，再乘 `1e-6`，把 µV 转成 V |
-| `trial` | trial 起点的采样点索引；当前调用减 1，将 MATLAB 的 1-based 转成 Python 的 0-based |
-| `y` | trial 标签，转成 `int16`，标签数值不做减 1 |
-| `fs` | 原文件采样率；构建 Raw 时实际使用脚本顶部的 `sfreq`，不会自动采用此字段 |
-| `classes`、`session` | 类别说明和原 session 信息；保留在读取结果中 |
+| `X` | 连续电压，原始形状为 `(采样点, 30 个通道)`；转置为通道 × 采样点，再乘 `1e-6`，将 µV 转为 V |
+| `trial` | trial 起始采样点；从 MATLAB 1-based 减 1 转为 Python 0-based |
+| `y` | trial 标签，转为 `int16`；标签数值不减 1 |
+| `fs` | 原采样率字段保留；构建 Raw 实际使用代码中的 `sfreq=256`，不会自动采用该字段 |
+| `classes`、`session` | 类别和会话信息，保留在 MAT 读取结果中 |
 
-`loadmat(..., simplify_cells=True)` 后，`data` 必须能被当前读取循环当作 session 序列处理。此读取器面向现有 MAT 结构；其他数据结构，尤其被简化成单个字典的单 session 文件，需要先适配。
+30 个通道的顺序由源码 `ch_names` 指定，通道类型均为 EEG，电极布局为 `colin27_1005`。换数据时必须核对电压单位、矩阵方向、通道顺序及真实采样率。若单 session 文件被 `simplify_cells=True` 简化成单个字典，需先适配读取器。
 
-默认通道顺序由顶部 `ch_names` 的 30 个名称决定，`ch_types` 全部为 `eeg`，`sfreq=256`，`montage_name="colin27_1005"`。通道顺序必须与 `X` 的列对应。换数据时同时核对单位、形状、采样率和电极布局。
+Raw 和 JSON 使用被试名加 **0-based session 遍历序号**作为键，如 `A0`、`A1`；这些键不直接采用 MAT 中的 `session` 值。当前模板覆盖默认被试的两个 session；数据 session 数量变化时同步补全键。
 
-Raw 字典和配置使用 **被试名 + session 的 0-based 序号**，例如 `A0`、`A1`。这些键依据遍历顺序生成，不直接读取 MAT 的 `session` 字段。
-
-### 两个 JSON 怎么填
-
-`configs/bad_channels_exclude.json` 每个 session 对应一个坏道名称列表。示例仅展示一个键；使用时保留全部需要处理的 session 键：
+[`configs/bad_channels_exclude.json`](configs/bad_channels_exclude.json) 保存坏道名称，例如：
 
 ```json
 {
@@ -101,202 +108,124 @@ Raw 字典和配置使用 **被试名 + session 的 0-based 序号**，例如 `A
 }
 ```
 
-`[]` 表示该 session 暂未标记坏道；键缺失会触发 `KeyError`。通道名称必须与 `ch_names` 一致。插值保留通道数量，不是删除通道。
+上例仅展示部分键，使用时保留其他 session。名称须与 `ch_names` 一致；插值会恢复坏道并保留通道数量。空列表表示未指定坏道，缺少 session 键会报错。
 
-`configs/ica_exclude.json` 有两层标注：
+[`configs/ica_exclude.json`](configs/ica_exclude.json) 分两层保存人工判断：
 
 ```json
 {
-  "topomap_exclude": {
-    "A0": [0, 3],
-    "A1": []
-  },
-  "final_exclude": {
-    "A0": [3],
-    "A1": []
-  }
+  "topomap_exclude": {"A0": [0, 3], "A1": []},
+  "final_exclude": {"A0": [3], "A1": []}
 }
 ```
 
-`topomap_exclude` 是从成分地形图选出的候选 IC，决定绘制哪些 properties 图；`final_exclude` 是人工确认后实际排除的 IC。**IC 索引从 0 开始**，且应小于该 session 的 `ica.n_components_`。候选列表不会自动转成最终列表。
+`topomap_exclude` 为地形图中初步选出的候选 IC，决定 properties 阶段画哪些成分；`final_exclude` 为进一步确认后实际排除的 IC。索引从 0 开始，必须小于对应模型的 `ica.n_components_`。候选列表不会自动成为最终列表。
 
-发布模板中所有列表均为 `[]`：properties 阶段会逐个跳过没有候选 IC 的 session；重建阶段仍会加载或拟合 ICA 并写出文件，但不排除任何 IC。这些空列表是待填写模板，不代表已经完成质量检查。
+发布模板的所有列表都为空。此时 properties 阶段会跳过各 session；clean 阶段仍会重建并保存，但不会排除任何 IC。空模板不表示数据已完成质量检查。调整坏道、滤波、参考、ICA 方法或输入后，应重新读图确认 IC 索引，不要沿用此前模型的标注。
 
-## 3. 用 True / False 控制工作流
+## 4. 主版本：按阶段运行
 
-实际执行顺序固定为：
+[`run_preprocessing.py`](run_preprocessing.py) 只负责选择步骤、设置恢复起点和工作目录，实际处理仍调用 [`src/Preprocessing.py`](src/Preprocessing.py) 的 `main`。
 
-```text
-读取 MAT / 命中数据缓存 → 构建 Raw
-  → 原始波形图（可选）
-  → 坏道插值（可选）
-  → 前滤波（可选）
-  → 重参考（可选）
-  → ICA 成分地形图（可选）
-  → 候选 IC properties 图（可选）
-  → 排除最终 IC 并重建（可选）
-  → 后滤波（可选）
+| `--stage` | 开启的处理步骤 | 输出 |
+| --- | --- | --- |
+| `waveforms` | 读 MAT → 构建 Raw → 画原始波形 | `results/waveforms/` |
+| `ica`，默认 | 读 MAT → 构建 Raw → 坏道插值 → 前滤波 → 重参考 → ICA → 地形图 | `results/components/` 和各阶段缓存 |
+| `properties` | 与 `ica` 相同的上游和 ICA → 候选 IC properties 图 | `results/properties/<session>/` |
+| `clean` | 与 `ica` 相同的上游和 ICA → 排除最终 IC → 后滤波 | cleaned 和后滤波 FIF |
+
+推荐依次执行：
+
+```powershell
+# 1. 查看原始波形，然后编辑 bad_channels_exclude.json
+.\.venv\Scripts\python.exe run_preprocessing.py --stage waveforms
+
+# 2. 查看 ICA 地形图，然后填写 topomap_exclude
+.\.venv\Scripts\python.exe run_preprocessing.py --stage ica
+
+# 3. 查看候选成分诊断图，然后填写 final_exclude
+.\.venv\Scripts\python.exe run_preprocessing.py --stage properties
+
+# 4. 排除确认的伪迹并生成最终带通信号
+.\.venv\Scripts\python.exe run_preprocessing.py --stage clean
 ```
 
-修改文件末尾 `if __name__ == '__main__':` 下的 `main(...)` 控制直接运行脚本时的行为。也可以在本目录调用：
+默认从 `is_load_cached_mat` 开始。已有缓存且参数和标识匹配时会复用，缺失或失效时重新处理；不需要手动删除全部缓存来运行下一阶段。
+
+源码直接入口 `python src/Preprocessing.py` 当前预设 `start="is_ica_cache"`，用于恢复已有 ICA 缓存，且开启 properties、关闭地形图和重建。**新克隆没有缓存时，请使用辅助入口；直接执行源码默认入口会因缓存缺失而失败。**
+
+### 恢复到中间步骤
+
+例如，已完成 ICA 后只画 properties：
+
+```powershell
+.\.venv\Scripts\python.exe run_preprocessing.py --stage properties --start is_ica_cache
+```
+
+`--start` 接受源码的步骤键。该键必须在选定阶段中开启；它之前的全部步骤会被关闭。有独立处理缓存的中间起点会读取本步已有缓存，在比较本步参数及 `version` 时忽略上游缓存标识；若所需键、标识或数据缺失、失效，则报错。`is_build_valid_raw` 和 `is_view_waveforms` 起点使用已有 MAT 缓存，不重新读原始文件。两个 ICA 绘图起点直接使用已有模型，不重新验证 ICA 方法参数及版本，使用前需确认模型仍适用。ICA 及绘图起点还要求能找到模型对应的上游 Raw 或 MAT 缓存。
+
+常用步骤键为 `is_load_cached_mat`、`is_build_valid_raw`、`is_view_waveforms`、`is_exclude_bads_and_interpolate`、`is_pre_filter`、`is_set_reference`、`is_ica_cache`、`is_gen_components_topomap`、`is_gen_properties`、`is_mark_artifacts_and_build`、`is_after_filter`。
+
+首次运行、调整处理参数或人工标注后，使用默认起点让依赖链重新检查。尤其不要把需要重新应用的清理步骤设为缓存恢复起点：恢复模式依赖已经存在且匹配的结果。
+
+### 参数修改位置
+
+| 目标 | 主版本中修改的位置与当前值 |
+| --- | --- |
+| 被试、通道、采样率、布局、缓存版本 | `src/Preprocessing.py` 顶部；`sfreq=256`、`version=2` |
+| 输入转换 | `main()` 调用 `load_cached_mat` 的参数；转置、trial 减 1、缩放 `1e-6` |
+| 插值、滤波、参考、并行设置 | `main()` 中相应函数调用；1 Hz 前高通、平均参考、4–40 Hz 后带通，前后陷波均关闭 |
+| ICA 方法 | `ica_cache()` 中的 `mne.preprocessing.ICA(...)`；Picard、`rng=1`、`fit_params={"extended": True, "ortho": False}`；`decim=3` 在 `main()` 调用处 |
+| properties 连续波形范围 | `main()` 调用 `gen_properties`；`t_start_s=0.0`、`duration=10.0` |
+
+主版本不读取 `configs/config.py`。只修改函数定义的默认值不一定改变运行行为，因为 `main()` 多数会显式传参。`decim` 减少 ICA 拟合采样点，不改变 Raw 的采样率。启用陷波需同时核对频率与真实采样率；后滤波当前 `notch_freqs=None` 不能直接配合默认 FIR 陷波使用。
+
+### 缓存与最终输出
+
+主版本为各阶段保存缓存键、缓存标识和数据，上游重新计算会产生新标识并传给下游。坏道和最终 IC 标注文件的修改时间也参与对应阶段的键比较。ICA 建模与 Raw 的缓存标识分开，绘图使用已有模型。
+
+缓存不会自动比较 MAT 文件的内容、大小或修改时间；替换同路径 MAT、修改通道信息或算法实现后，应递增顶部 `version`，从头检查所需阶段。主版本 ICA 的固定方法参数并未全部进入键，改 ICA 方法同样应递增版本并重新确认标注。中间恢复起点按本步缓存工作，不能用于验证上游的新设置。
+
+当前清理结果为 `cache/cache_v2/raw_cleaned/<session>_cleaned_raw.fif`；4–40 Hz 后滤波结果位于 `cache/raw_after_filter_4-40/<session>_pre_filter_raw.fif`。后者复用统一滤波函数，因此文件名仍带 `pre_filter`，且当前路径由 `main()` 单独指定，未放在 `cache_v2/` 内；更改后滤波频段时请同步核对目录名。波形、地形图和 properties 开启后重新绘制，关闭不会删除旧图片。
+
+`main()` 返回最终 Raw 字典，但代码不自动切 trial、提取特征或生成训练提交文件。trial 起点与标签仍来自 MAT 读取结果；下游训练须自行对齐分段。
+
+## 5. 独立的配置实验版本
+
+[`src/preprocessing_config_version.py`](src/preprocessing_config_version.py) 将插值、前滤波、参考、ICA 和后滤波的方法参数放在 [`configs/config.py`](configs/config.py)，并按实验参数隔离缓存、记录快照。它与主版本的缓存结构不同，不能混用缓存文件。
+
+```powershell
+.\.venv\Scripts\python.exe src/preprocessing_config_version.py
+```
+
+**该脚本当前默认只开启 ICA 缓存和成分地形图；坏道插值、前滤波、重参考、properties、伪迹重建和后滤波均关闭。** 即使 `config.py` 中写有滤波频率，也不会自动开启对应步骤。流程开关、滤波子步骤开关、路径、被试、并行度及版本在该脚本的 `main()` 内修改；它不使用辅助入口的 `--stage`。
+
+此版本的 MAT 缓存位于 `cache/data/`；上游插值、滤波、参考及 ICA 位于 `cache/config_version/ica_<upstream_id>/`；清理和后滤波位于 `cache/config_version/run_<experiment_id>/`。图与快照位于 `results/config_version/<experiment_id>/`，快照文件为 `config_snapshot.json`。
+
+参数、流程设置、坏道内容、数据约定、MNE 版本等决定上游编号；后滤波及最终 IC 列表决定运行编号，单独修改后滤波或最终 IC 列表可复用同一上游 ICA。绘图本身不作为信号处理缓存的依据。替换同路径 MAT 或修改算法实现仍需增加本版本 `main()` 中的 `version`。
+
+恢复历史方法参数的示例：
 
 ```python
-from src.Preprocessing import main
+import json
+from pathlib import Path
+from src.preprocessing_config_version import main
 
-main(
-    is_view_waveforms=False,
-    is_exclude_bads_and_interpolate=True,
-    is_pre_filter=True,
-    is_set_reference=True,
-    is_gen_components_topomap=True,
-    is_gen_properties=False,
-    is_mark_artifacts_and_build=False,
-    is_after_filter=False,
-)
+snapshot = json.loads(Path("results/config_version/<实验编号>/config_snapshot.json").read_text(encoding="utf-8"))
+raw_dic = main(config=snapshot["config"])
 ```
 
-`main` 的函数默认值是八个开关全部 `False`；文件末尾显式传入的值不同。当前源码的脚本入口开启 **坏道插值、前滤波、重参考、properties 图**，其余关闭。清空配置后，properties 不会生成图；想首次检查 ICA，请按上面的调用开启成分地形图。
+此调用只恢复 `config` 中的方法参数；流程开关、数据约定及人工标注仍以当前代码和 JSON 文件为准。快照也保存了这些信息，完整复现实验时需一并核对和恢复。该版本 `main()` 同样返回 Raw 字典；properties、地形图和重建只读取已建立的 ICA 模型，因此首次运行或更改上游时应保持 `is_ica_cache=True`。
 
-| 开关 | `True` | `False` | 当前脚本入口 |
-| --- | --- | --- | --- |
-| `is_view_waveforms` | 将原始 Raw 波形图写到 `results/waveforms/` | 不画图 | `False` |
-| `is_exclude_bads_and_interpolate` | 执行插值函数；命中对应缓存则加载插值后的 Raw | 不调用函数，也不读插值缓存 | `True` |
-| `is_pre_filter` | 调用前滤波；当前内部设置为 1 Hz 高通、不开陷波 | 不读前滤波缓存，继续传递当前 Raw | `True` |
-| `is_set_reference` | 重参考；当前为平均参考，可命中缓存 | 跳过重参考及其缓存 | `True` |
-| `is_gen_components_topomap` | 加载或拟合 ICA，重新绘制全部 IC 地形图到 `results/components/` | 不画地形图；其他 ICA 阶段仍可独立执行 | `False` |
-| `is_gen_properties` | 对候选列表非空的 session 加载或拟合 ICA，并画 properties 图 | 不画 properties 图 | `True` |
-| `is_mark_artifacts_and_build` | 加载或拟合 ICA，用 `final_exclude` 重建并写入 `cache/raw_cleaned/` | 不重建，也不加载已有 cleaned 文件 | `False` |
-| `is_after_filter` | 调用后滤波；当前为 8–30 Hz 带通，可命中缓存 | 不读后滤波缓存，也不生成该阶段输出 | `False` |
+## 6. 常见问题
 
-读取 MAT 和构建 Raw 始终执行。全部 `False` 仍会读取数据或数据缓存并构建 Raw，但不会拟合 ICA、绘图或自动写出最终 Raw；`main()` 当前没有返回值，也不输出 trial 分段、特征或训练数据。
+- 找不到 MAT：检查 `data/`、`subjects` 以及工作目录；主版本推荐使用辅助入口。
+- 提示起点缓存无法读取：新环境先省略 `--start`，完整运行相应阶段；旧版缓存没有当前所需标识时也应重新生成。
+- properties 没有图：模板候选列表为空，先看地形图并填写 `topomap_exclude`。
+- 没有清理后的 FIF：运行 `--stage clean`，填写 `final_exclude`；仅画图不会生成最终信号。
+- 调整数据后结果似乎没变：缓存不追踪原始数据内容，增加对应版本的 `version` 后从头运行；也检查是否仍在看旧结果目录。
+- 数据和生成文件无法提交到 Git：发布副本的 `.gitignore` 排除了数据、缓存、图和资料，保留目录占位符及需要共享的源码和配置。
 
-### 分阶段操作示例
+## 7. 本次发布验证
 
-以下各阶段都从 MAT/数据缓存开始，再按开关执行；上游处理开关和参数应保持一致：
-
-| 目标 | 波形 | 插值 | 前滤波 | 参考 | 地形图 | properties | 重建 | 后滤波 |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 先看原始波形、填写坏道 JSON | True | False | False | False | False | False | False | False |
-| 插值及预处理后，检查 ICA 地形图 | False | True | True | True | True | False | False | False |
-| 填好候选列表后，检查候选 IC | False | True | True | True | False | True | False | False |
-| 填好最终列表后，重建及后滤波 | False | True | True | True | False | False | True | True |
-
-操作顺序：看波形 → 填坏道列表 → 使受影响的缓存失效 → 看 ICA 地形图 → 填候选列表 → 看 properties → 填最终列表 → 重建和后滤波。生成图不需要先运行另一个绘图阶段；三个 ICA 函数都能自己加载或拟合 ICA。
-
-前后滤波还有函数内部的 `is_filter` 和 `is_notch_filter`：
-
-| `is_filter` | `is_notch_filter` | 当前阶段效果 |
-| --- | --- | --- |
-| False | False | 直接返回输入 Raw，不查缓存、不写缓存 |
-| True | False | 仅执行 `filter`，或读取对应参数的缓存 |
-| False | True | 仅执行 `notch_filter`，或读取对应参数的缓存 |
-| True | True | 未命中缓存时先陷波，再执行 `filter` |
-
-外层 `is_pre_filter` / `is_after_filter=False` 时，内部开关不会被执行。布尔值须使用 Python 的 `True` / `False`，不要写成字符串 `"False"`。
-
-## 4. 缓存如何运作，以及开关对缓存的影响
-
-### 命中规则
-
-`_load_cache` 将本阶段的处理参数与 `version` 组成缓存键，和 `.key.pkl` 中的键比较。**缓存数据文件和键文件都存在，且键相同，才视为命中**。未命中则重新计算，并覆盖同名缓存。
-
-当前机制不比较输入 Raw 的数据、通道信息、annotations，也不比较 MAT 或 JSON 的文件内容、大小和修改时间。它不是自动追踪整条工作流依赖的缓存系统。
-
-| 阶段 | 文件 / 目录 | 缓存键主要内容 |
-| --- | --- | --- |
-| MAT 读取 | `cache/data/scherer_read_mat.pkl` + `scherer_read_mat.key.pkl` | 数据目录绝对路径、被试列表及顺序、索引/形状转换、缩放系数、版本 |
-| 坏道插值 | `cache/raw_interp/{session}_interp.fif` + `.key.pkl` | 坏道 JSON 的绝对路径、`reset_bads`、`method`、`mode`、版本；不含 JSON 内容 |
-| 前滤波 | `cache/raw_pre_filter/{session}_pre_filter_raw.fif` + `{session}_pre_filter.key.pkl` | 两个内部开关、滤波及陷波参数、版本；不含输入 Raw |
-| 重参考 | `cache/raw_referenced/{session}_referenced.fif` + `.key.pkl` | 参考方式、通道类型、`joint`、REST 参数、版本 |
-| ICA | `cache/ica/{session}_ica.fif` + `.key.pkl` | **仅 `decim` 和版本**，三个 ICA 函数共用同一文件 |
-| ICA 重建输出 | `cache/raw_cleaned/{session}_cleaned.fif` | **没有键文件、没有命中判断**；每次开启重建都重新 apply 并覆盖写出 |
-| 后滤波 | `cache/raw_after_filter/{session}_after_filter_raw.fif` + `{session}_after_filter.key.pkl` | 两个内部开关、滤波及陷波参数、版本；不含输入 Raw |
-
-FIF 缓存加载时使用 `preload=True`；命中避免重新计算，但仍有磁盘读取和内存占用。`build_valid_raw` 每次重建，`cache/raw/` 目前没有被实际使用。波形、地形图和 properties 图没有图片缓存命中机制，开启后会重新生成并覆盖同名图片；关闭不会删除旧图片。
-
-### 需要记住的组合
-
-| 控制与状态 | 实际效果 |
-| --- | --- |
-| 本阶段 `True`，缓存目录有效，键命中 | 调用函数，加载该阶段的处理结果；绘图函数加载 ICA 后仍重新画图 |
-| 本阶段 `True`，缓存缺失或参数/版本不同 | 按当前输入计算，再写入缓存 |
-| 本阶段 `False`，即使磁盘已有该阶段缓存 | 整步跳过，既不加载，也不清除缓存 |
-| 函数支持的 `*_cache_dir=None` | 不读、不写该阶段缓存，执行时重新计算 |
-| 上游阶段改成 `False`，下游仍 `True` 且命中旧缓存 | 下游可能载入以前包含该上游处理的结果；当前开关不一定反映在最终数据中 |
-
-例如，先运行“插值 → 前滤波 → 平均参考”，随后仅把插值关掉，而前滤波参数和 `version` 不变，前滤波仍可能加载之前对**插值后数据**计算的缓存。改变上游滤波参数后，ICA 也可能命中旧模型，因为 ICA 的键不包含这些参数。
-
-**改变数据、处理顺序、上游开关、配置内容或处理实现时，应同时让受影响的下游缓存失效。** 最方便的方式是递增脚本顶部的全局 `version`（当前为 `2`），`main` 会把新值传给所有缓存阶段；只有此次开启的阶段会在运行时重新计算。直接调用单个函数时，要自行传入一致的 `version`，函数默认是 `1`。
-
-也可以删除受影响的缓存文件及对应 `.key.pkl`，并继续清理或更新其下游缓存。仅删除插值缓存不会自动使前滤波、参考或 ICA 失效；仅修改本阶段参数通常只使本阶段失效。
-
-### 标注修改后怎样处理
-
-| 改动 | 应采取的操作 |
-| --- | --- |
-| 替换同路径 MAT；改变通道、采样率、布局或上游工作流 | 增加全局版本，重新运行所需阶段，保证下游 ICA 对应新 Raw |
-| 修改坏道 JSON 列表，但路径不变 | 增加版本，或清除插值及全部受影响的下游缓存 |
-| 仅修改 `topomap_exclude` | 上游和 ICA 未改变时，可直接重跑 properties；该列表每次从 JSON 读取 |
-| 仅修改 `final_exclude` | 上游和 ICA 未改变时，可直接重跑重建；**已有后滤波缓存还需失效**，否则可能得到旧的重建结果 |
-| 修改 ICA 的 `n_components`、`method`、`rng`、`fit_params` | 这些参数当前没有进入 ICA 键，需要增加版本；重新检查 IC 编号和两个排除列表 |
-
-只改变候选或最终排除列表，不需要重新拟合原 ICA；如果重新拟合了 ICA，则旧 IC 编号对应的成分可能变化，标注也需要重新确认。
-
-支持 `None` 的缓存参数包括 `data_cache_dir`、`raw_interp_cache_dir`、`raw_pre_filter_cache_dir`、`raw_referenced_cache_dir`、`ica_cache_dir` 和 `raw_after_filter_cache_dir`。**`mark_artifacts_and_build` 的 `raw_cleaned_cache_dir` 必须是 `Path`，不能设为 `None`**；`ica_cache_dir=None` 只能关闭 ICA 模型缓存，重建结果仍会写出。
-
-## 5. 重要参数怎么调
-
-以下值指 `main()` 当前传入的值，不一定是函数定义的默认值。调整处理参数在 `main` 内相应函数调用处进行；只修改函数默认值，若 `main` 仍显式传值，就不会改变脚本运行行为。
-
-| 函数 / 配置 | 最重要的参数与当前值 | 调整要点 |
-| --- | --- | --- |
-| 顶部配置 | `subjects`、`ch_names`、`ch_types`、`sfreq=256`、`montage_name`、`version=2` | 选取被试；按真实数据匹配通道及采样率。上游输入或处理逻辑变化时更新版本 |
-| `load_cached_mat` / `_read_mat` | `convert_index=True`、`convert_shape=True`、`scale_factor=1e-6` | 输入已是 0-based 时关闭索引转换；已是通道×采样点时关闭转置；已是 V 时不再乘 `1e-6`，可传 `None` 或 `1.0` |
-| `load_cached_mat` | `cache_file_name='scherer_read_mat.pkl'`、`data_cache_dir` | 不同实验可使用不同缓存文件名或目录；`None` 关闭读取层缓存 |
-| `build_valid_raw` | `ch_names`、`ch_types`、`sfreq`、`montage_name` | 通道名称/类型数量与数据行数一致；采样率不会自动从 MAT 推断。这个函数不缓存，也不对 trial 分段 |
-| `view_waveforms` | `scalings=35e-6`、`n_channels=len(ch_names)`、`start=0`、`duration=30` | `scalings` 按 V 调节显示尺度，也支持 `'auto'`；`start` 和 `duration` 单位为秒，换时间段检查。此处调参只影响图片 |
-| `exclude_bads_and_interpolate` | `reset_bads=True`、`method={'eeg':'spline'}`、`mode='accurate'` | `reset_bads=True` 在插值后清空坏道标记；`False` 保留标记，可能影响后续通道选择。`mode` 支持 `'fast'` / `'accurate'`，主要针对 MNE 最小范数插值；当前 EEG 使用 spline |
-| `pre_filter` | `is_filter=True`、`l_freq=1.0`、`h_freq=None`、`picks='eeg'` | 当前是 ICA 前的高通。`h_freq=None` 不做低通；改成数值后形成相应带通。修改上游频段后同步使 ICA 缓存失效 |
-| `pre_filter` / `after_filter` | `is_notch_filter=False`、前滤波 `notch_freqs=[50.0,100.0]` | 列出频率不会自动开启陷波，必须同时设内部开关。按数据实际工频填写；所有频率须适合真实采样率 |
-| `set_reference` | `ref_channels='average'`、`ch_type='eeg'`、`joint=False` | 可换参考通道名称列表，或使用 `'REST'`；当前直接重参考，没有使用 projection。改变参考方式后更新下游 ICA |
-| 三个 ICA 函数 | `decim=3`、`ica_cache_dir` | `decim=1` 使用全部拟合采样点；更大值减少拟合点数，不改变原始 Raw 采样率。不是带抗混叠滤波的重采样，须结合输入带宽决定。保持三个函数的 `decim` 一致 |
-| `gen_components_topomap` | `components_dir` | 画全部已拟合 IC；不自动识别伪迹，也不更改 Raw |
-| `gen_properties` | `ica_exclude_file` 的 `topomap_exclude`、`properties_dir` | 仅绘制候选 IC；空列表直接跳过该 session。图片写到 `{properties_dir}/{session}/` |
-| `mark_artifacts_and_build` | `final_exclude`、`raw_cleaned_cache_dir` | 仅排除最终确认 IC；`ica.apply` 修改字典中的 Raw，再保存。修改排除列表后需要处理后滤波旧缓存 |
-| `after_filter` | `is_filter=True`、`l_freq=8.0`、`h_freq=30.0`、`picks='eeg'` | 当前是后处理的 8–30 Hz 频段，按下游任务改动。它在输入的当前 Raw 上工作，若关闭重建，也能对未经过 ICA 清理的数据执行 |
-
-### 滤波与重参考的进阶参数
-
-前后滤波都支持 `method='fir'` / `'iir'`。当前使用 `phase='zero'`、`filter_length='auto'`、自动过渡带、`fir_window='hamming'`、`fir_design='firwin'`。优先调截止频率和是否陷波，再根据需要调整这些设计参数。
-
-- `l_freq=None`：不做高通；`h_freq=None`：不做低通。常规带通应满足 `0 < l_freq < h_freq < sfreq/2`，当前 Nyquist 频率为 128 Hz。
-- `filter_length` 和 `l_trans_bandwidth` / `h_trans_bandwidth` 控制 FIR 长度及过渡带。遇到滤波器长于数据段的提示时，结合数据长度和目标频段调整；`iir_params` 仅用于 IIR。
-- `n_jobs` / `notch_n_jobs` 控制对应计算的并行度，当前为 `None`。`verbose` / `notch_verbose` 控制日志，不是工作流开关，也不参与滤波缓存键。
-- `notch_freqs=None` 仅用于 `notch_method='spectrum_fit'` 的自动检测；启用当前后滤波陷波时，需补充明确频率，或同时选择该方法。当前后滤波 `notch_method='fir'`，不能只把开关改成 `True` 而保留 `None`。
-- REST 的 `pos=15.0` 控制源网格间距，`exclude=30.0` 控制球心附近的排除距离，单位为 mm；`trans=None` 是当前球模型的配置。REST 分支在检查每个 session 缓存之前就构建 forward，因此缓存命中仍可能有额外模型计算。
-
-### ICA 拟合参数在哪里改
-
-当前三个 ICA 函数内部都写有：
-
-```python
-mne.preprocessing.ICA(
-    n_components=None,
-    rng=1,
-    method='picard',
-    fit_params={'extended': True, 'ortho': False},
-)
-```
-
-这些是函数体内的固定值，不能直接作为 `main()` 参数传入。需要调整时，应同时修改三个函数，或在自己的调用代码中统一实现拟合。`n_components=None` 交给 MNE 根据数据选择成分数，并不承诺恰好得到 30 个成分；`rng` 控制随机性；使用 `picard` 需要安装 `python-picard`。修改这些固定参数后更新 `version`，再重新确认 IC 标注。
-
-参数的完整定义可参考 [MNE ICA 文档](https://mne.tools/stable/generated/mne.preprocessing.ICA.html)、[Raw 的滤波与插值 API](https://mne.tools/stable/generated/mne.io.Raw.html) 和 [EEG 重参考 API](https://mne.tools/stable/generated/mne.set_eeg_reference.html)。本 README 的流程及缓存行为以本仓库源码为准。
-
-## 6. 输出与常见问题
-
-- 看不到图形窗口：程序使用 `Agg`，到 `results/` 对应子目录查看 PNG。
-- 首次运行没有 properties 图：发布模板的候选列表为空，先开启 ICA 地形图并填写 `topomap_exclude`。
-- 修改 JSON 后结果没变：坏道内容不在插值缓存键中；最终 IC 改动也不会自动使后滤波缓存失效。按第 4 节更新版本或清理受影响的缓存。
-- 没有最终 FIF：重建开启才写 `raw_cleaned`；后滤波开启且启用其缓存目录才写 `raw_after_filter`。`results/` 主要存图，不是最终信号导出目录。
-- 想接入训练：自行读取对应的最终 FIF，或调用返回 Raw 字典的处理函数；trial 起点和标签在 MAT 读取字典里，需要另行对齐及分段。`main()` 不返回最终 Raw 字典。
-- 数据或中间文件显示为 Git ignored：这是发布副本的正常行为。`.gitignore` 保留目录占位符，排除数据、缓存、结果、资料和废弃目录中新生成的文件；两个配置文件仍可正常提交。
+已在 Python 3.12.13 环境使用隔离的合成 MAT / EEG 数据验证：分阶段入口、主版本从零处理及缓存恢复、缓存版本失效、插值与前后滤波、ICA 建模与人工排除、波形及诊断绘图，以及配置版 9 被试 / 18 session 的参数快照和缓存复用。原始源码与方法配置按 SHA-256 核对一致。本次验证没有运行真实数据的全量处理，也不评估解码性能；实际数据仍需人工检查坏道和 ICA。

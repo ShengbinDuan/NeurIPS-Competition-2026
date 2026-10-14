@@ -18,6 +18,10 @@ Our current submission achieved a **Balanced Accuracy of 0.90** in the warm-up p
 ## EEG preprocessing
 
 The warm-up EEG preprocessing project is available in [`preprocessing/`](preprocessing/).
-Its [Chinese README](preprocessing/README.md) explains data placement, manual annotations,
-workflow switches, cache invalidation, and the most important processing parameters.
-The project includes source code and empty configuration templates; data and generated artifacts are excluded.
+Its [Chinese README](preprocessing/README.md) covers installation, data placement,
+manual annotations, workflow stages, cache recovery, and experiment configuration snapshots.
+Use `preprocessing/run_preprocessing.py` for the staged workflow, or
+`preprocessing/src/preprocessing_config_version.py` for configuration-driven experiments.
+The [changelog](preprocessing/CHANGELOG.md) records the 2026-10-14 framework update.
+The project includes source code, empty annotation templates, and the runtime directory skeleton;
+raw data and generated artifacts are excluded from this module.

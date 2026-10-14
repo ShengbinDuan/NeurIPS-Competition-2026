@@ -1,0 +1,6 @@
+# Core dependencies verified with Python 3.12.13 in the research environment.
+matplotlib==3.11.2
+mne==1.13.2
+numpy==2.5.3
+python-picard==0.8.2
+scipy==1.18.1
